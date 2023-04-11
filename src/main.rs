@@ -1,7 +1,7 @@
-extern crate piston_window;
-
 use piston_window::{clear, rectangle, Button, Key, PistonWindow, PressEvent, RenderEvent, WindowSettings};
 use piston_window::{EventLoop, UpdateEvent};
+use rand::Rng;
+
 
 const GRID_SIZE: f64 = 20.0;
 const WINDOW_SIZE: f64 = 600.0;
@@ -19,6 +19,19 @@ struct Snake {
     direction: Direction,
 }
 
+struct Food {
+    x: f64,
+    y: f64,
+}
+
+fn generate_food_position() -> (f64, f64) {
+    let mut rng = rand::thread_rng();
+    (
+        (rng.gen_range(0..(WINDOW_SIZE as u32 / GRID_SIZE as u32)) * GRID_SIZE as u32) as f64,
+        (rng.gen_range(0..(WINDOW_SIZE as u32 / GRID_SIZE as u32)) * GRID_SIZE as u32) as f64,
+    )
+}
+
 fn main() {
     let mut window: PistonWindow = WindowSettings::new("Snake", [WINDOW_SIZE, WINDOW_SIZE])
         .exit_on_esc(true)
@@ -27,6 +40,14 @@ fn main() {
     window.set_ups(3);
 
     let mut snake = Snake { x: 0.0, y: 0.0, direction: Direction::Right };
+    let mut food = Food {
+        x: 0.0,
+        y: 0.0,
+    };
+    let (food_x, food_y) = generate_food_position();
+    food.x = food_x;
+    food.y = food_y;
+
 
     while let Some(event) = window.next() {
         if let Some(_) = event.render_args() {
@@ -40,6 +61,20 @@ fn main() {
                     context.transform,
                     graphics,
                 );
+                // Draw the food
+                rectangle(
+                    [1.0, 0.0, 0.0, 1.0],
+                    [food.x, food.y, GRID_SIZE, GRID_SIZE],
+                    context.transform,
+                    graphics,
+                );
+
+                if snake.x == food.x && snake.y == food.y {
+                    // Increase the snake's length and generate a new food position
+                    let (new_food_x, new_food_y) = generate_food_position();
+                    food.x = new_food_x;
+                    food.y = new_food_y;
+                }
             });
         }
 
