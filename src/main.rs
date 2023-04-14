@@ -178,10 +178,18 @@ fn main() {
         }
 
         match event.press_args() {
-            Some(Button::Keyboard(Key::Up)) => snake.direction = Direction::Up,
-            Some(Button::Keyboard(Key::Down)) => snake.direction = Direction::Down,
-            Some(Button::Keyboard(Key::Left)) => snake.direction = Direction::Left,
-            Some(Button::Keyboard(Key::Right)) => snake.direction = Direction::Right,
+            Some(Button::Keyboard(Key::Up)) => if let Direction::Down = snake.direction {} else {
+                snake.direction = Direction::Up
+            },
+            Some(Button::Keyboard(Key::Down)) => if let Direction::Up = snake.direction {} else {
+                snake.direction = Direction::Down
+            },
+            Some(Button::Keyboard(Key::Left)) => if let Direction::Right = snake.direction {} else {
+                snake.direction = Direction::Left
+            },
+            Some(Button::Keyboard(Key::Right)) => if let Direction::Left = snake.direction {} else {
+                snake.direction = Direction::Right
+            },
             Some(Button::Mouse(MouseButton::Left)) => {
                 if snake.dead {
                     let [mouse_x, mouse_y] = mouse_pos;
