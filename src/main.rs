@@ -35,10 +35,13 @@ struct SnakePiece {
     position: Position,
 }
 
+
+impl PartialEq<&mut Food> for SnakePiece {
+    fn eq(&self, other: &&mut Food) -> bool { self.x == other.x && self.y == other.y }
+}
+
 impl PartialEq for SnakePiece {
-    fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.y == other.y
-    }
+    fn eq(&self, other: &Self) -> bool { self.x == other.x && self.y == other.y }
 }
 
 struct Snake {
@@ -88,7 +91,7 @@ impl Snake {
         if self.coordinates.contains(&new_head) {
             self.dead = true;
         } else {
-            if new_head.x == food.x && new_head.y == food.y {
+            if new_head == food {
                 // Increase the snake's length and generate a new food position
                 food.regenerate();
             } else {
