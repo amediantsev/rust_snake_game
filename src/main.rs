@@ -2,9 +2,10 @@ use piston_window::{clear, rectangle, Button, Key, PistonWindow, PressEvent, Ren
 use piston_window::{EventLoop, UpdateEvent};
 use piston_window::{text, Glyphs, TextureSettings, Transformed};
 use piston_window::{MouseCursorEvent, MouseButton};
-use piston_window::math::Matrix2d;
+use piston_window::math::{Matrix2d};
 use piston_window::{Image, Texture, Flip, G2dTexture};
 use rand::Rng;
+use crate::Position::Angle;
 
 const GRID_SIZE: f64 = 30.0;
 const WINDOW_SIZE: f64 = 600.0;
@@ -17,6 +18,7 @@ const BUTTON_TEXT_SIZE: u32 = 24;
 const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
 
 
+#[derive(Clone, Copy, PartialEq)]
 enum Direction {
     Up,
     Down,
@@ -24,9 +26,11 @@ enum Direction {
     Right,
 }
 
+
 enum Position {
     Horizontal,
     Vertical,
+    Angle { rotation_rad: f64 },
 }
 
 struct SnakePiece {
@@ -46,6 +50,7 @@ impl PartialEq for SnakePiece {
 
 struct Snake {
     coordinates: Vec<SnakePiece>,
+    previous_direction: Direction,
     direction: Direction,
     dead: bool,
 }
@@ -54,6 +59,7 @@ impl Default for Snake {
     fn default() -> Self {
         Snake {
             coordinates: vec![SnakePiece { x: 0.0, y: 0.0, position: Position::Horizontal }],
+            previous_direction: Direction::Right,
             direction: Direction::Right,
             dead: false,
         }
@@ -63,25 +69,59 @@ impl Default for Snake {
 impl Snake {
     fn current_head(&self) -> &SnakePiece { self.coordinates.last().unwrap() }
 
-    fn generate_new_piece(&self) -> SnakePiece {
+    fn turn(&mut self, direction: Direction) {
+        self.previous_direction = self.direction;
+        self.direction = direction;
+    }
+
+    fn generate_new_piece(&mut self) -> SnakePiece {
         let position = self.current_head();
-        match self.direction {
+        let (new_x, new_y) = match self.direction {
             Direction::Up => {
                 let new_y = position.y - GRID_SIZE;
-                SnakePiece { x: position.x, y: if new_y < 0.0 { WINDOW_SIZE } else { new_y }, position: Position::Vertical }
+                (position.x, if new_y < 0.0 { WINDOW_SIZE } else { new_y })
             }
             Direction::Down => {
                 let new_y = position.y + GRID_SIZE;
-                SnakePiece { x: position.x, y: if new_y > WINDOW_SIZE { 0.0 } else { new_y }, position: Position::Vertical }
+                (position.x, if new_y > WINDOW_SIZE { 0.0 } else { new_y })
             }
             Direction::Left => {
                 let new_x = position.x - GRID_SIZE;
-                SnakePiece { x: if new_x < 0.0 { WINDOW_SIZE } else { new_x }, y: position.y, position: Position::Horizontal }
+                (if new_x < 0.0 { WINDOW_SIZE } else { new_x }, position.y)
             }
             Direction::Right => {
                 let new_x = position.x + GRID_SIZE;
-                SnakePiece { x: if new_x > WINDOW_SIZE { 0.0 } else { new_x }, y: position.y, position: Position::Horizontal }
+                (if new_x > WINDOW_SIZE { 0.0 } else { new_x }, position.y)
             }
+        };
+        SnakePiece {
+            x: new_x,
+            y: new_y,
+            position: {
+                if self.previous_direction == self.direction {
+                    match self.direction {
+                        Direction::Right | Direction::Left => Position::Horizontal,
+                        Direction::Up | Direction::Down => Position::Vertical,
+                    }
+                } else {
+                    let angle = Angle {
+                        rotation_rad: match (self.previous_direction, self.direction) {
+                            (Direction::Up, Direction::Left) | (Direction::Left, Direction::Up) => {
+                                std::f64::consts::PI * 1.5
+                            }
+                            (Direction::Right, Direction::Up) | (Direction::Up, Direction::Right) => {
+                                std::f64::consts::PI
+                            }
+                            (Direction::Down, Direction::Left) | (Direction::Left, Direction::Down) => {
+                                std::f64::consts::PI / 2.0
+                            }
+                            _ => 0.0
+                        }
+                    };
+                    self.previous_direction = self.direction;
+                    angle
+                }
+            },
         }
     }
 
@@ -104,21 +144,35 @@ impl Snake {
         }
     }
 
-    fn draw(&self, context: piston_window::Context, graphics: &mut G2d, head_texture: &G2dTexture, body_piece_texture: &G2dTexture) {
+    fn draw(&self, context: piston_window::Context, graphics: &mut G2d, head_texture: &G2dTexture, body_piece_texture: &G2dTexture, snake_angle_piece_texture: &G2dTexture) {
         let head = self.current_head();
         for body_part in &self.coordinates {
-            let texture = if body_part == head { head_texture } else { body_piece_texture };
-            let transform = if body_part == head {
-                context.transform.trans(body_part.x, body_part.y)
+            let (texture, transform) = if body_part == head {
+                (head_texture, context.transform.trans(body_part.x, body_part.y))
             } else {
-                let angle = match body_part.position {
-                    Position::Horizontal => 0.0,
-                    Position::Vertical => std::f64::consts::PI / 2.0,
-                };
-                context.transform
-                    .trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0)
-                    .rot_rad(angle)
-                    .trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
+                match body_part.position {
+                    Position::Vertical => {
+                        (
+                            body_piece_texture,
+                            context.transform
+                                .trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0)
+                                .rot_rad(std::f64::consts::PI / 2.0)
+                                .trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
+                        )
+                    }
+                    Position::Horizontal => {
+                        (body_piece_texture, context.transform.trans(body_part.x, body_part.y))
+                    }
+                    Angle { rotation_rad } => {
+                        (
+                            snake_angle_piece_texture,
+                            context.transform
+                                .trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0)
+                                .rot_rad(rotation_rad)
+                                .trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
+                        )
+                    }
+                }
             };
             Image::new().draw(
                 texture,
@@ -167,7 +221,7 @@ fn main() {
         .exit_on_esc(true)
         .build()
         .unwrap();
-    window.set_ups(7);
+    window.set_ups(2);
 
     let mut food = Food::new();
     let texture_context = window.create_texture_context();
@@ -186,6 +240,12 @@ fn main() {
         Flip::None,
         &TextureSettings::new(),
     ).unwrap();
+    let snake_angle_piece_texture = Texture::from_path(
+        &mut texture_context,
+        "images/poop_angle.png",
+        Flip::None,
+        &TextureSettings::new(),
+    ).unwrap();
     let mut snake = Snake::default();
 
     while let Some(event) = window.next() {
@@ -194,7 +254,7 @@ fn main() {
                 // Clear the window
                 clear([0.0, 0.0, 0.0, 1.0], graphics);
 
-                snake.draw(context, graphics, &head_texture, &body_piece_texture);
+                snake.draw(context, graphics, &head_texture, &body_piece_texture, &snake_angle_piece_texture);
                 food.draw(context.transform, graphics);
 
                 if snake.dead {
@@ -244,18 +304,10 @@ fn main() {
         }
 
         match event.press_args() {
-            Some(Button::Keyboard(Key::Up)) => if let Direction::Down = snake.direction {} else {
-                snake.direction = Direction::Up
-            },
-            Some(Button::Keyboard(Key::Down)) => if let Direction::Up = snake.direction {} else {
-                snake.direction = Direction::Down
-            },
-            Some(Button::Keyboard(Key::Left)) => if let Direction::Right = snake.direction {} else {
-                snake.direction = Direction::Left
-            },
-            Some(Button::Keyboard(Key::Right)) => if let Direction::Left = snake.direction {} else {
-                snake.direction = Direction::Right
-            },
+            Some(Button::Keyboard(Key::Up)) => snake.turn(Direction::Up),
+            Some(Button::Keyboard(Key::Down)) => snake.turn(Direction::Down),
+            Some(Button::Keyboard(Key::Left)) => snake.turn(Direction::Left),
+            Some(Button::Keyboard(Key::Right)) => snake.turn(Direction::Right),
             Some(Button::Mouse(MouseButton::Left)) => {
                 if snake.dead {
                     let [mouse_x, mouse_y] = mouse_pos;
