@@ -61,7 +61,14 @@ impl Snake {
     }
 
     pub fn turn(&mut self, direction: Direction) {
+        println!("TURN TO {:?}", direction);
         self.direction = direction;
+        self.pieces.last_mut().unwrap().direction_to = self.direction;
+        // let len = self.pieces.len();
+        // if len >= 2 {
+        //     self.pieces.get_mut(len - 2).unwrap().direction_to = self.direction;
+        //     println!("Changed neck - {:?}", self.pieces.get(len - 2).unwrap());
+        // }
     }
 
     fn generate_new_piece(&mut self) -> SnakePiece {
@@ -106,6 +113,11 @@ impl Snake {
                 // Remove the tail
                 self.pieces.remove(0);
             }
+            // let len = self.pieces.len();
+            // if len >= 2 {
+            //     self.pieces.get_mut(len - 2).unwrap().direction_to = self.direction;
+            //     println!("Changed neck - {:?}", self.pieces.get(len - 2).unwrap());
+            // }
             self.pieces.push(new_head);
         }
     }
@@ -137,13 +149,13 @@ impl Snake {
                     (from, to) => {
                         // Angle of the snake's body.
                         let rotation_rad = match (from, to) {
-                            (Direction::Up, Direction::Left) | (Direction::Left, Direction::Up) => {
+                            (Direction::Right, Direction::Up) | (Direction::Up, Direction::Left) => {
                                 std::f64::consts::PI * 1.5
                             }
-                            (Direction::Right, Direction::Up) | (Direction::Up, Direction::Right) => {
+                            (Direction::Down, Direction::Right) | (Direction::Left, Direction::Up) => {
                                 std::f64::consts::PI
                             }
-                            (Direction::Down, Direction::Left) | (Direction::Left, Direction::Down) => {
+                            (Direction::Up, Direction::Right) | (Direction::Left, Direction::Down) => {
                                 std::f64::consts::PI / 2.0
                             }
                             _ => 0.0

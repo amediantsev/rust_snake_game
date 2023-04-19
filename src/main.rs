@@ -25,7 +25,7 @@ fn main() {
         .exit_on_esc(true)
         .build()
         .unwrap();
-    window.set_ups(2);
+    window.set_ups(8);
 
     let mut food = Food::new(WINDOW_SIZE, GRID_SIZE);
     let texture_context = window.create_texture_context();
