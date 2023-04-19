@@ -1,10 +1,14 @@
-use piston_window::{clear, rectangle, Button, Key, PistonWindow, PressEvent, RenderEvent, WindowSettings, CharacterCache, G2d};
-use piston_window::{EventLoop, UpdateEvent};
-use piston_window::{text, Glyphs, TextureSettings, Transformed};
-use piston_window::{MouseCursorEvent, MouseButton};
-use piston_window::math::{Matrix2d};
-use piston_window::{Image, Texture, Flip, G2dTexture};
-use rand::Rng;
+use piston_window::{
+    clear, Button, Key, PistonWindow, PressEvent, EventLoop, UpdateEvent, Flip,
+    RenderEvent, WindowSettings, CharacterCache, Glyphs, TextureSettings, Transformed,
+    MouseCursorEvent, MouseButton, Texture, text, rectangle,
+};
+
+mod snake;
+mod food;
+
+use snake::{Snake, Direction};
+use food::Food;
 
 const GRID_SIZE: f64 = 30.0;
 const WINDOW_SIZE: f64 = 600.0;
@@ -14,197 +18,6 @@ const BUTTON_HEIGHT: f64 = 50.0;
 const BUTTON_X: f64 = (WINDOW_SIZE - BUTTON_WIDTH) / 2.0;
 const BUTTON_Y: f64 = 350.0;
 const BUTTON_TEXT_SIZE: u32 = 24;
-const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
-
-
-#[derive(Clone, Copy, PartialEq)]
-enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
-}
-// impl Direction {
-//     is_vertical(
-// }
-
-
-// struct Angle { rotation_rad: f64 },
-
-struct SnakePiece {
-    x: f64,
-    y: f64,
-    direction_from: Direction,
-    direction_to: Direction,
-}
-
-
-impl PartialEq<&mut Food> for SnakePiece {
-    fn eq(&self, other: &&mut Food) -> bool { self.x == other.x && self.y == other.y }
-}
-
-impl PartialEq for SnakePiece {
-    fn eq(&self, other: &Self) -> bool { self.x == other.x && self.y == other.y }
-}
-
-struct Snake {
-    pieces: Vec<SnakePiece>,
-    direction: Direction,
-    dead: bool,
-}
-
-impl Default for Snake {
-    fn default() -> Self {
-        Snake {
-            pieces: vec![SnakePiece { x: 0.0, y: 0.0, direction_from: Direction::Right, direction_to: Direction::Right }],
-            direction: Direction::Right,
-            dead: false,
-        }
-    }
-}
-
-impl Snake {
-    fn head(&self) -> &SnakePiece { self.pieces.last().unwrap() }
-
-    // fn neck(&self) -> Option<&SnakePiece> {
-    //     let len = self.pieces.len();
-    //     if len >= 2 { self.pieces.get(len - 2) } else { None }
-    // }
-
-    fn turn(&mut self, direction: Direction) {
-        self.direction = direction;
-    }
-
-    fn generate_new_piece(&mut self) -> SnakePiece {
-        let current_head = self.head();
-        let (new_x, new_y) = match self.direction {
-            Direction::Up => {
-                let new_y = current_head.y - GRID_SIZE;
-                (current_head.x, if new_y < 0.0 { WINDOW_SIZE } else { new_y })
-            }
-            Direction::Down => {
-                let new_y = current_head.y + GRID_SIZE;
-                (current_head.x, if new_y > WINDOW_SIZE { 0.0 } else { new_y })
-            }
-            Direction::Left => {
-                let new_x = current_head.x - GRID_SIZE;
-                (if new_x < 0.0 { WINDOW_SIZE } else { new_x }, current_head.y)
-            }
-            Direction::Right => {
-                let new_x = current_head.x + GRID_SIZE;
-                (if new_x > WINDOW_SIZE { 0.0 } else { new_x }, current_head.y)
-            }
-        };
-        SnakePiece {
-            x: new_x,
-            y: new_y,
-            direction_from: current_head.direction_to,
-            direction_to: self.direction,
-        }
-    }
-
-    fn move_ahead(&mut self, food: &mut Food) {
-        let new_head = self.generate_new_piece();
-        // Check if the snake's new head position encounters its own body
-        if self.pieces.contains(&new_head) {
-            self.dead = true;
-        } else {
-            if new_head == food {
-                // Increase the snake's length and generate a new food position
-                food.regenerate();
-            } else {
-                // Remove the tail
-                self.pieces.remove(0);
-            }
-            self.pieces.push(new_head);
-        }
-    }
-
-    fn draw(&self, context: piston_window::Context, graphics: &mut G2d, head_texture: &G2dTexture, body_piece_texture: &G2dTexture, snake_angle_piece_texture: &G2dTexture) {
-        let head = self.head();
-        for body_part in &self.pieces {
-            let (texture, transform) = if body_part == head {
-                (head_texture, context.transform.trans(body_part.x, body_part.y))
-            } else {
-                match (body_part.direction_from, body_part.direction_to) {
-                    ((Direction::Right | Direction::Left), Direction::Left | Direction::Right) => {
-                        // Horizontal straight piece
-                        (body_piece_texture, context.transform.trans(body_part.x, body_part.y))
-                    }
-                    ((Direction::Up | Direction::Down), Direction::Down | Direction::Up) => {
-                        // Vertical straight piece
-                        (
-                            body_piece_texture,
-                            context.transform
-                                .trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0)
-                                .rot_rad(std::f64::consts::PI / 2.0)
-                                .trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
-                        )
-                    }
-                    (from, to) => {
-                        // Angle of the snake's body.
-                        let rotation_rad = match (from, to) {
-                            (Direction::Up, Direction::Left) | (Direction::Left, Direction::Up) => {
-                                std::f64::consts::PI * 1.5
-                            }
-                            (Direction::Right, Direction::Up) | (Direction::Up, Direction::Right) => {
-                                std::f64::consts::PI
-                            }
-                            (Direction::Down, Direction::Left) | (Direction::Left, Direction::Down) => {
-                                std::f64::consts::PI / 2.0
-                            }
-                            _ => 0.0
-                        };
-                        (
-                            snake_angle_piece_texture,
-                            context.transform
-                                .trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0)
-                                .rot_rad(rotation_rad)
-                                .trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
-                        )
-                    }
-                }
-            };
-            Image::new().draw(
-                texture,
-                &context.draw_state,
-                transform,
-                graphics,
-            );
-        }
-    }
-}
-
-fn get_random_coordinate() -> f64 {
-    let mut rng = rand::thread_rng();
-    (rng.gen_range(0..(WINDOW_SIZE as u32 / GRID_SIZE as u32)) * GRID_SIZE as u32) as f64
-}
-
-struct Food {
-    x: f64,
-    y: f64,
-}
-
-impl Food {
-    fn new() -> Food {
-        Food {
-            x: get_random_coordinate(),
-            y: get_random_coordinate(),
-        }
-    }
-    fn regenerate(&mut self) {
-        self.x = get_random_coordinate();
-        self.y = get_random_coordinate();
-    }
-    fn draw(&self, transform: Matrix2d, graphics: &mut G2d) {
-        rectangle(
-            RED,
-            [self.x, self.y, GRID_SIZE, GRID_SIZE],
-            transform,
-            graphics,
-        );
-    }
-}
 
 
 fn main() {
@@ -214,7 +27,7 @@ fn main() {
         .unwrap();
     window.set_ups(2);
 
-    let mut food = Food::new();
+    let mut food = Food::new(WINDOW_SIZE, GRID_SIZE);
     let texture_context = window.create_texture_context();
     let mut glyphs = Glyphs::new("/Library/Fonts/Arial Unicode.ttf", texture_context, TextureSettings::new()).unwrap();
     let mut mouse_pos = [0.0, 0.0];
@@ -242,7 +55,6 @@ fn main() {
     while let Some(event) = window.next() {
         if let Some(_) = event.render_args() {
             window.draw_2d(&event, |context, graphics, device| {
-                // Clear the window
                 clear([0.0, 0.0, 0.0, 1.0], graphics);
 
                 snake.draw(context, graphics, &head_texture, &body_piece_texture, &snake_angle_piece_texture);
@@ -263,7 +75,6 @@ fn main() {
                         graphics,
                     ).unwrap();
 
-                    // Draw the button
                     rectangle(
                         [1.0, 1.0, 1.0, 1.0],
                         [BUTTON_X, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT],
@@ -284,7 +95,6 @@ fn main() {
                         graphics,
                     ).unwrap();
 
-                    // Update glyphs before rendering.
                     glyphs.factory.encoder.flush(device);
                 }
             });
