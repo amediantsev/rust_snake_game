@@ -2,11 +2,11 @@ use piston_window::{clear, rectangle, Button, Key, PistonWindow, PressEvent, Ren
 use piston_window::{EventLoop, UpdateEvent};
 use piston_window::{text, Glyphs, TextureSettings, Transformed};
 use piston_window::{MouseCursorEvent, MouseButton};
-use piston_window::types::Color;
 use piston_window::math::Matrix2d;
+use piston_window::{Image, Texture, Flip};
 use rand::Rng;
 
-const GRID_SIZE: f64 = 20.0;
+const GRID_SIZE: f64 = 30.0;
 const WINDOW_SIZE: f64 = 600.0;
 
 const BUTTON_WIDTH: f64 = 150.0;
@@ -14,7 +14,7 @@ const BUTTON_HEIGHT: f64 = 50.0;
 const BUTTON_X: f64 = (WINDOW_SIZE - BUTTON_WIDTH) / 2.0;
 const BUTTON_Y: f64 = 350.0;
 const BUTTON_TEXT_SIZE: u32 = 24;
-const BRIGHT_GREEN: [f32; 4] = [0.0, 1.0, 0.0, 1.0];
+const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
 
 
 enum Direction {
@@ -24,31 +24,20 @@ enum Direction {
     Right,
 }
 
-struct Cell {
+struct SnakePiece {
     x: f64,
     y: f64,
-    color: Color,
+    // direction: Option<Direction>
 }
 
-impl Cell {
-    fn draw(&self, transform: Matrix2d, graphics: &mut G2d) {
-        rectangle(
-            self.color,
-            [self.x, self.y, GRID_SIZE, GRID_SIZE],
-            transform,
-            graphics,
-        );
-    }
-}
-
-impl PartialEq for Cell {
+impl PartialEq for SnakePiece {
     fn eq(&self, other: &Self) -> bool {
         self.x == other.x && self.y == other.y
     }
 }
 
 struct Snake {
-    coordinates: Vec<Cell>,
+    coordinates: Vec<SnakePiece>,
     direction: Direction,
     dead: bool,
 }
@@ -56,7 +45,7 @@ struct Snake {
 impl Default for Snake {
     fn default() -> Self {
         Snake {
-            coordinates: vec![Cell { x: 0.0, y: 0.0, color: BRIGHT_GREEN }],
+            coordinates: vec![SnakePiece { x: 0.0, y: 0.0 }],
             direction: Direction::Right,
             dead: false,
         }
@@ -64,39 +53,81 @@ impl Default for Snake {
 }
 
 impl Snake {
-    fn current_head(&self) -> &Cell { self.coordinates.last().unwrap() }
+    fn current_head(&self) -> &SnakePiece { self.coordinates.last().unwrap() }
 
-    fn calculate_new_head(&self) -> Cell {
+    fn calculate_new_head(&self) -> SnakePiece {
         let position = self.current_head();
         match self.direction {
             Direction::Up => {
                 let new_y = position.y - GRID_SIZE;
-                Cell { x: position.x, y: if new_y < 0.0 { WINDOW_SIZE } else { new_y }, color: BRIGHT_GREEN }
+                SnakePiece { x: position.x, y: if new_y < 0.0 { WINDOW_SIZE } else { new_y } }
             }
             Direction::Down => {
                 let new_y = position.y + GRID_SIZE;
-                Cell { x: position.x, y: if new_y > WINDOW_SIZE { 0.0 } else { new_y }, color: BRIGHT_GREEN }
+                SnakePiece { x: position.x, y: if new_y > WINDOW_SIZE { 0.0 } else { new_y } }
             }
             Direction::Left => {
                 let new_x = position.x - GRID_SIZE;
-                Cell { x: if new_x < 0.0 { WINDOW_SIZE } else { new_x }, y: position.y, color: BRIGHT_GREEN }
+                SnakePiece { x: if new_x < 0.0 { WINDOW_SIZE } else { new_x }, y: position.y }
             }
             Direction::Right => {
                 let new_x = position.x + GRID_SIZE;
-                Cell { x: if new_x > WINDOW_SIZE { 0.0 } else { new_x }, y: position.y, color: BRIGHT_GREEN }
+                SnakePiece { x: if new_x > WINDOW_SIZE { 0.0 } else { new_x }, y: position.y }
             }
+        }
+    }
+
+    fn move_ahead(&mut self, food: &mut Food) {
+        let new_head = self.calculate_new_head();
+        // Check if the snake's new head position encounters its own body
+        if self.coordinates.contains(&new_head) {
+            self.dead = true;
+        } else {
+            if new_head.x == food.x && new_head.y == food.y {
+                // Increase the snake's length and generate a new food position
+                food.regenerate();
+            } else {
+                // Remove the tail
+                self.coordinates.remove(0);
+            }
+
+            // Add the new head position
+            self.coordinates.push(new_head);
         }
     }
 }
 
-fn generate_food() -> Cell {
+fn get_random_coordinate() -> f64 {
     let mut rng = rand::thread_rng();
-    Cell {
-        x: (rng.gen_range(0..(WINDOW_SIZE as u32 / GRID_SIZE as u32)) * GRID_SIZE as u32) as f64,
-        y: (rng.gen_range(0..(WINDOW_SIZE as u32 / GRID_SIZE as u32)) * GRID_SIZE as u32) as f64,
-        color: [1.0, 0.0, 0.0, 1.0],
+    (rng.gen_range(0..(WINDOW_SIZE as u32 / GRID_SIZE as u32)) * GRID_SIZE as u32) as f64
+}
+
+struct Food {
+    x: f64,
+    y: f64,
+}
+
+impl Food {
+    fn new() -> Food {
+        Food {
+            x: get_random_coordinate(),
+            y: get_random_coordinate(),
+        }
+    }
+    fn regenerate(&mut self) {
+        self.x = get_random_coordinate();
+        self.y = get_random_coordinate();
+    }
+    fn draw(&self, transform: Matrix2d, graphics: &mut G2d) {
+        rectangle(
+            RED,
+            [self.x, self.y, GRID_SIZE, GRID_SIZE],
+            transform,
+            graphics,
+        );
     }
 }
+
 
 fn main() {
     let mut window: PistonWindow = WindowSettings::new("Snake", [WINDOW_SIZE, WINDOW_SIZE])
@@ -105,11 +136,24 @@ fn main() {
         .unwrap();
     window.set_ups(7);
 
-    let mut snake = Snake::default();
-    let mut food = generate_food();
+    let mut food = Food::new();
     let texture_context = window.create_texture_context();
     let mut glyphs = Glyphs::new("/Library/Fonts/Arial Unicode.ttf", texture_context, TextureSettings::new()).unwrap();
     let mut mouse_pos = [0.0, 0.0];
+    let mut texture_context = window.create_texture_context();
+    let head_texture = Texture::from_path(
+        &mut texture_context,
+        "images/huilo.png",
+        Flip::None,
+        &TextureSettings::new(),
+    ).unwrap();
+    let body_piece_texture = Texture::from_path(
+        &mut texture_context,
+        "images/poop_horizontal.png",
+        Flip::None,
+        &TextureSettings::new(),
+    ).unwrap();
+    let mut snake = Snake::default();
 
     while let Some(event) = window.next() {
         if let Some(_) = event.render_args() {
@@ -117,12 +161,16 @@ fn main() {
                 // Clear the window
                 clear([0.0, 0.0, 0.0, 1.0], graphics);
 
-                // Draw the snake
                 let head = snake.current_head();
                 for body_part in &snake.coordinates {
-                    body_part.draw(context.transform, graphics);
+                    let texture = if body_part == head { &head_texture } else { &body_piece_texture };
+                    Image::new().draw(
+                        texture,
+                        &context.draw_state,
+                        context.transform.trans(body_part.x, body_part.y),
+                        graphics,
+                    );
                 }
-                // Draw the food
                 food.draw(context.transform, graphics);
 
                 if snake.dead {
@@ -161,14 +209,8 @@ fn main() {
                         graphics,
                     ).unwrap();
 
-
                     // Update glyphs before rendering.
                     glyphs.factory.encoder.flush(device);
-                }
-
-                if head.x == food.x && head.y == food.y {
-                    // Increase the snake's length and generate a new food position
-                    food = generate_food();
                 }
             });
         }
@@ -200,7 +242,7 @@ fn main() {
                     {
                         // Restart the game
                         snake = Snake::default();
-                        food = generate_food();
+                        food.regenerate();
                     }
                 }
             }
@@ -208,23 +250,7 @@ fn main() {
         }
 
         if let Some(_) = event.update_args() {
-            let new_head = snake.calculate_new_head();
-
-            // Check if the snake's new head position encounters its own body
-            if snake.coordinates.contains(&new_head) {
-                snake.dead = true;
-            } else {
-                if new_head.x == food.x && new_head.y == food.y {
-                    // Increase the snake's length and generate a new food position
-                    food = generate_food();
-                } else {
-                    // Remove the tail
-                    snake.coordinates.remove(0);
-                }
-
-                // Add the new head position
-                snake.coordinates.push(new_head);
-            }
+            snake.move_ahead(&mut food);
         }
     }
 }
