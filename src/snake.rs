@@ -150,13 +150,13 @@ impl Snake {
                         // Angle of the snake's body.
                         let rotation_rad = match (from, to) {
                             (Direction::Right, Direction::Up) | (Direction::Up, Direction::Left) => {
-                                std::f64::consts::PI * 1.5
+                                std::f64::consts::PI / 2
                             }
                             (Direction::Down, Direction::Right) | (Direction::Left, Direction::Up) => {
                                 std::f64::consts::PI
                             }
                             (Direction::Up, Direction::Right) | (Direction::Left, Direction::Down) => {
-                                std::f64::consts::PI / 2.0
+                                std::f64::consts::PI * 1.5
                             }
                             _ => 0.0
                         };
