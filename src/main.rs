@@ -3,7 +3,7 @@ use piston_window::{EventLoop, UpdateEvent};
 use piston_window::{text, Glyphs, TextureSettings, Transformed};
 use piston_window::{MouseCursorEvent, MouseButton};
 use piston_window::math::Matrix2d;
-use piston_window::{Image, Texture, Flip};
+use piston_window::{Image, Texture, Flip, G2dTexture};
 use rand::Rng;
 
 const GRID_SIZE: f64 = 30.0;
@@ -24,10 +24,15 @@ enum Direction {
     Right,
 }
 
+enum Position {
+    Horizontal,
+    Vertical,
+}
+
 struct SnakePiece {
     x: f64,
     y: f64,
-    // direction: Option<Direction>
+    position: Position,
 }
 
 impl PartialEq for SnakePiece {
@@ -45,7 +50,7 @@ struct Snake {
 impl Default for Snake {
     fn default() -> Self {
         Snake {
-            coordinates: vec![SnakePiece { x: 0.0, y: 0.0 }],
+            coordinates: vec![SnakePiece { x: 0.0, y: 0.0, position: Position::Horizontal }],
             direction: Direction::Right,
             dead: false,
         }
@@ -55,30 +60,30 @@ impl Default for Snake {
 impl Snake {
     fn current_head(&self) -> &SnakePiece { self.coordinates.last().unwrap() }
 
-    fn calculate_new_head(&self) -> SnakePiece {
+    fn generate_new_piece(&self) -> SnakePiece {
         let position = self.current_head();
         match self.direction {
             Direction::Up => {
                 let new_y = position.y - GRID_SIZE;
-                SnakePiece { x: position.x, y: if new_y < 0.0 { WINDOW_SIZE } else { new_y } }
+                SnakePiece { x: position.x, y: if new_y < 0.0 { WINDOW_SIZE } else { new_y }, position: Position::Vertical }
             }
             Direction::Down => {
                 let new_y = position.y + GRID_SIZE;
-                SnakePiece { x: position.x, y: if new_y > WINDOW_SIZE { 0.0 } else { new_y } }
+                SnakePiece { x: position.x, y: if new_y > WINDOW_SIZE { 0.0 } else { new_y }, position: Position::Vertical }
             }
             Direction::Left => {
                 let new_x = position.x - GRID_SIZE;
-                SnakePiece { x: if new_x < 0.0 { WINDOW_SIZE } else { new_x }, y: position.y }
+                SnakePiece { x: if new_x < 0.0 { WINDOW_SIZE } else { new_x }, y: position.y, position: Position::Horizontal }
             }
             Direction::Right => {
                 let new_x = position.x + GRID_SIZE;
-                SnakePiece { x: if new_x > WINDOW_SIZE { 0.0 } else { new_x }, y: position.y }
+                SnakePiece { x: if new_x > WINDOW_SIZE { 0.0 } else { new_x }, y: position.y, position: Position::Horizontal }
             }
         }
     }
 
     fn move_ahead(&mut self, food: &mut Food) {
-        let new_head = self.calculate_new_head();
+        let new_head = self.generate_new_piece();
         // Check if the snake's new head position encounters its own body
         if self.coordinates.contains(&new_head) {
             self.dead = true;
@@ -93,6 +98,31 @@ impl Snake {
 
             // Add the new head position
             self.coordinates.push(new_head);
+        }
+    }
+
+    fn draw(&self, context: piston_window::Context, graphics: &mut G2d, head_texture: &G2dTexture, body_piece_texture: &G2dTexture) {
+        let head = self.current_head();
+        for body_part in &self.coordinates {
+            let texture = if body_part == head { head_texture } else { body_piece_texture };
+            let transform = if body_part == head {
+                context.transform.trans(body_part.x, body_part.y)
+            } else {
+                let angle = match body_part.position {
+                    Position::Horizontal => 0.0,
+                    Position::Vertical => std::f64::consts::PI / 2.0,
+                };
+                context.transform
+                    .trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0)
+                    .rot_rad(angle)
+                    .trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
+            };
+            Image::new().draw(
+                texture,
+                &context.draw_state,
+                transform,
+                graphics,
+            );
         }
     }
 }
@@ -161,16 +191,7 @@ fn main() {
                 // Clear the window
                 clear([0.0, 0.0, 0.0, 1.0], graphics);
 
-                let head = snake.current_head();
-                for body_part in &snake.coordinates {
-                    let texture = if body_part == head { &head_texture } else { &body_piece_texture };
-                    Image::new().draw(
-                        texture,
-                        &context.draw_state,
-                        context.transform.trans(body_part.x, body_part.y),
-                        graphics,
-                    );
-                }
+                snake.draw(context, graphics, &head_texture, &body_piece_texture);
                 food.draw(context.transform, graphics);
 
                 if snake.dead {
