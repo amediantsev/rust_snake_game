@@ -61,14 +61,8 @@ impl Snake {
     }
 
     pub fn turn(&mut self, direction: Direction) {
-        println!("TURN TO {:?}", direction);
         self.direction = direction;
         self.pieces.last_mut().unwrap().direction_to = self.direction;
-        // let len = self.pieces.len();
-        // if len >= 2 {
-        //     self.pieces.get_mut(len - 2).unwrap().direction_to = self.direction;
-        //     println!("Changed neck - {:?}", self.pieces.get(len - 2).unwrap());
-        // }
     }
 
     fn generate_new_piece(&mut self) -> SnakePiece {
@@ -101,7 +95,6 @@ impl Snake {
 
     pub fn move_ahead(&mut self, food: &mut Food) {
         let new_head = self.generate_new_piece();
-        println!("New head: {:?}", new_head);
         // Check if the snake's new head position encounters its own body
         if self.pieces.contains(&new_head) {
             self.dead = true;
@@ -113,11 +106,6 @@ impl Snake {
                 // Remove the tail
                 self.pieces.remove(0);
             }
-            // let len = self.pieces.len();
-            // if len >= 2 {
-            //     self.pieces.get_mut(len - 2).unwrap().direction_to = self.direction;
-            //     println!("Changed neck - {:?}", self.pieces.get(len - 2).unwrap());
-            // }
             self.pieces.push(new_head);
         }
     }
@@ -126,18 +114,15 @@ impl Snake {
         let head = self.head();
         for body_part in &self.pieces {
             let (texture, transform) = if body_part == head {
-                println!("drawing head {:?}", body_part);
                 (head_texture, context.transform.trans(body_part.x, body_part.y))
             } else {
                 match (body_part.direction_from, body_part.direction_to) {
                     (Direction::Right | Direction::Left, Direction::Left | Direction::Right) => {
                         // Horizontal straight piece
-                        println!("drawing horizontal poop for {:?}", body_part);
                         (body_piece_texture, context.transform.trans(body_part.x, body_part.y))
                     }
                     (Direction::Up | Direction::Down, Direction::Down | Direction::Up) => {
                         // Vertical straight piece
-                        println!("drawing vertical poop for {:?}", body_part);
                         (
                             body_piece_texture,
                             context.transform
@@ -149,7 +134,7 @@ impl Snake {
                     (from, to) => {
                         // Angle of the snake's body.
                         let rotation_rad = match (from, to) {
-                            (Direction::Right, Direction::Up) | (Direction::Up, Direction::Left) => {
+                            (Direction::Right, Direction::Up) | (Direction::Down, Direction::Left) => {
                                 std::f64::consts::PI / 2.0
                             }
                             (Direction::Down, Direction::Right) | (Direction::Left, Direction::Up) => {
@@ -160,7 +145,6 @@ impl Snake {
                             }
                             _ => 0.0
                         };
-                        println!("drawing angle poop ({rotation_rad}) for {:?}", body_part);
                         (
                             snake_angle_piece_texture,
                             context.transform
