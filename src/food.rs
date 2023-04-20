@@ -1,13 +1,13 @@
-use piston_window::{G2d, rectangle, math};
+use piston_window::{G2d, G2dTexture, Image, Context, Transformed};
 use rand::Rng;
 
-const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
 
 pub struct Food {
     pub x: f64,
     pub y: f64,
     window_size: f64,
     grid_size: f64,
+    texture: G2dTexture,
 }
 
 impl Food {
@@ -15,25 +15,26 @@ impl Food {
         let mut rng = rand::thread_rng();
         (rng.gen_range(0..(self.window_size as u32 / self.grid_size as u32)) * self.grid_size as u32) as f64
     }
-    pub fn new(window_size: f64, grid_size: f64) -> Food {
+    pub fn new(window_size: f64, grid_size: f64, texture: G2dTexture) -> Food {
         let mut food = Food {
             x: 0.0,
             y: 0.0,
             window_size,
-            grid_size
+            grid_size,
+            texture,
         };
         food.regenerate();
-        food
+        return food;
     }
     pub fn regenerate(&mut self) {
         self.x = self.get_random_coordinate();
         self.y = self.get_random_coordinate();
     }
-    pub fn draw(&self, transform: math::Matrix2d, graphics: &mut G2d) {
-        rectangle(
-            RED,
-            [self.x, self.y, self.grid_size, self.grid_size],
-            transform,
+    pub fn draw(&self, context: Context, graphics: &mut G2d) {
+        Image::new().draw(
+            &self.texture,
+            &context.draw_state,
+            context.transform.trans(self.x, self.y),
             graphics,
         );
     }

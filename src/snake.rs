@@ -14,6 +14,17 @@ pub enum Direction {
     Right,
 }
 
+impl Direction {
+    fn is_opposite(self, other: Self) -> bool {
+        match other {
+            Direction::Up => other == Direction::Down,
+            Direction::Down => other == Direction::Up,
+            Direction::Left => other == Direction::Right,
+            Direction::Right => other == Direction::Left,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct SnakePiece {
     x: f64,
@@ -60,9 +71,15 @@ impl Snake {
         self.pieces.last().unwrap()
     }
 
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
     pub fn turn(&mut self, direction: Direction) {
-        self.direction = direction;
-        self.pieces.last_mut().unwrap().direction_to = self.direction;
+        if !self.direction.is_opposite(direction) {
+            self.direction = direction;
+            self.pieces.last_mut().unwrap().direction_to = self.direction;
+        }
     }
 
     fn generate_new_piece(&mut self) -> SnakePiece {
