@@ -16,7 +16,7 @@ pub enum Direction {
 
 impl Direction {
     fn is_opposite(self, other: Self) -> bool {
-        match other {
+        match self {
             Direction::Up => other == Direction::Down,
             Direction::Down => other == Direction::Up,
             Direction::Left => other == Direction::Right,
@@ -47,7 +47,6 @@ impl PartialEq for SnakePiece {
 
 pub struct Snake {
     pieces: Vec<SnakePiece>,
-    direction: Direction,
     pub dead: bool,
 }
 
@@ -60,7 +59,6 @@ impl Default for Snake {
                 direction_from: Direction::Right,
                 direction_to: Direction::Right,
             }],
-            direction: Direction::Right,
             dead: false,
         }
     }
@@ -76,37 +74,37 @@ impl Snake {
     }
 
     pub fn turn(&mut self, direction: Direction) {
-        if !self.direction.is_opposite(direction) {
-            self.direction = direction;
-            self.pieces.last_mut().unwrap().direction_to = self.direction;
+        let mut head = self.pieces.last_mut().unwrap();
+        if !(head.direction_to.is_opposite(direction)) {
+            head.direction_to = direction
         }
     }
 
     fn generate_new_piece(&mut self) -> SnakePiece {
         let current_head = self.head();
-        let (new_x, new_y) = match self.direction {
+        let (new_x, new_y) = match current_head.direction_to {
             Direction::Up => {
                 let new_y = current_head.y - GRID_SIZE;
-                (current_head.x, if new_y < 0.0 { WINDOW_SIZE } else { new_y })
+                (current_head.x, if new_y <= 0.0 { WINDOW_SIZE } else { new_y })
             }
             Direction::Down => {
                 let new_y = current_head.y + GRID_SIZE;
-                (current_head.x, if new_y > WINDOW_SIZE { 0.0 } else { new_y })
+                (current_head.x, if new_y >= WINDOW_SIZE { 0.0 } else { new_y })
             }
             Direction::Left => {
                 let new_x = current_head.x - GRID_SIZE;
-                (if new_x < 0.0 { WINDOW_SIZE } else { new_x }, current_head.y)
+                (if new_x <= 0.0 { WINDOW_SIZE } else { new_x }, current_head.y)
             }
             Direction::Right => {
                 let new_x = current_head.x + GRID_SIZE;
-                (if new_x > WINDOW_SIZE { 0.0 } else { new_x }, current_head.y)
+                (if new_x >= WINDOW_SIZE { 0.0 } else { new_x }, current_head.y)
             }
         };
         SnakePiece {
             x: new_x,
             y: new_y,
             direction_from: current_head.direction_to,
-            direction_to: self.direction,
+            direction_to: current_head.direction_to,
         }
     }
 
@@ -127,7 +125,7 @@ impl Snake {
         }
     }
 
-    pub fn draw(&self, context: Context, graphics: &mut G2d, head_texture: &G2dTexture, body_piece_texture: &G2dTexture, snake_angle_piece_texture: &G2dTexture) {
+    pub fn draw(&mut self, context: Context, graphics: &mut G2d, head_texture: &G2dTexture, body_piece_texture: &G2dTexture, snake_angle_piece_texture: &G2dTexture) {
         let head = self.head();
         for body_part in &self.pieces {
             let (texture, transform) = if body_part == head {

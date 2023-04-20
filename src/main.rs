@@ -31,7 +31,7 @@ fn main() {
         .exit_on_esc(true)
         .build()
         .unwrap();
-    window.set_ups(4);
+    window.set_ups(6);
 
     let texture_context = window.create_texture_context();
     let mut glyphs = Glyphs::new("/Library/Fonts/Arial Unicode.ttf", texture_context, TextureSettings::new()).unwrap();
@@ -67,10 +67,6 @@ fn main() {
         }
 
         handle_input_events(&event, &mut snake, &mut food, &mut mouse_pos);
-
-        if let Some(_) = event.update_args() {
-            snake.move_ahead(&mut food);
-        }
     }
 }
 
