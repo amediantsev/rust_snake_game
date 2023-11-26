@@ -85,19 +85,19 @@ impl Snake {
         let (new_x, new_y) = match current_head.direction_to {
             Direction::Up => {
                 let new_y = current_head.y - GRID_SIZE;
-                (current_head.x, if new_y < 0.0 { WINDOW_SIZE } else { new_y })
+                (current_head.x, if new_y < 0.0 { WINDOW_SIZE - GRID_SIZE } else { new_y })
             }
             Direction::Down => {
                 let new_y = current_head.y + GRID_SIZE;
-                (current_head.x, if new_y > WINDOW_SIZE { 0.0 } else { new_y })
+                (current_head.x, if new_y >= WINDOW_SIZE { 0.0 } else { new_y })
             }
             Direction::Left => {
                 let new_x = current_head.x - GRID_SIZE;
-                (if new_x < 0.0 { WINDOW_SIZE } else { new_x }, current_head.y)
+                (if new_x < 0.0 { WINDOW_SIZE - GRID_SIZE } else { new_x }, current_head.y)
             }
             Direction::Right => {
                 let new_x = current_head.x + GRID_SIZE;
-                (if new_x > WINDOW_SIZE { 0.0 } else { new_x }, current_head.y)
+                (if new_x >= WINDOW_SIZE { 0.0 } else { new_x }, current_head.y)
             }
         };
         SnakePiece {
@@ -140,10 +140,7 @@ impl Snake {
                         // Vertical straight piece
                         (
                             body_piece_texture,
-                            context.transform
-                                .trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0)
-                                .rot_rad(std::f64::consts::PI / 2.0)
-                                .trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
+                            context.transform.trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0).rot_rad(std::f64::consts::PI / 2.0).trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
                         )
                     }
                     (from, to) => {
@@ -162,10 +159,7 @@ impl Snake {
                         };
                         (
                             snake_angle_piece_texture,
-                            context.transform
-                                .trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0)
-                                .rot_rad(rotation_rad)
-                                .trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
+                            context.transform.trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0).rot_rad(rotation_rad).trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
                         )
                     }
                 }
