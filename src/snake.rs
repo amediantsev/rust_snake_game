@@ -4,7 +4,6 @@ use super::Food;
 
 const GRID_SIZE: f64 = 30.0;
 const WINDOW_SIZE: f64 = 600.0;
-const EDGE_POSITION: f64 = WINDOW_SIZE - GRID_SIZE;
 
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -59,24 +58,24 @@ impl PartialEq<&mut Food> for SnakePiece {
 pub struct Snake {
     pieces: Vec<SnakePiece>,
     pub dead: bool,
-}
-
-impl Default for Snake {
-    fn default() -> Self {
-        Snake {
-            pieces: vec![SnakePiece::new(0.0, 0.0, Direction::Right)],
-            dead: false,
-        }
-    }
+    window_size: f64,
 }
 
 impl Snake {
+    pub fn new(window_size: f64) -> Self {
+        Snake {
+            pieces: vec![SnakePiece::new(0.0, 0.0, Direction::Right)],
+            dead: false,
+            window_size,
+        }
+    }
+
     fn head(&self) -> &SnakePiece {
         self.pieces.last().unwrap()
     }
 
     pub fn reset(&mut self) {
-        *self = Self::default();
+        *self = Self::new(self.window_size);
     }
 
     pub fn turn(&mut self, direction: Direction) {
@@ -99,7 +98,7 @@ impl Snake {
 
     fn get_new_coordinate(&self, coordinate: f64, is_increment: bool) -> f64 {
         let new_coordinate = if is_increment { coordinate + GRID_SIZE } else { coordinate - GRID_SIZE };
-        if new_coordinate < 0.0 { EDGE_POSITION } else if new_coordinate >= WINDOW_SIZE { 0.0 } else { new_coordinate }
+        if new_coordinate < 0.0 { self.window_size - GRID_SIZE } else if new_coordinate >= WINDOW_SIZE { 0.0 } else { new_coordinate }
     }
 
     pub fn move_ahead(&mut self, food: &mut Food) {
