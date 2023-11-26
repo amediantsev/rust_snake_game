@@ -1,5 +1,5 @@
 use piston_window::{G2d, G2dTexture, Image, Context, Transformed};
-use rand::Rng;
+use rand::{Rng, thread_rng};
 
 
 pub struct Food {
@@ -11,8 +11,7 @@ pub struct Food {
 }
 
 impl Food {
-    fn get_random_coordinate(&self) -> f64 {
-        let mut rng = rand::thread_rng();
+    fn get_random_coordinate(&self, rng: &mut impl Rng) -> f64 {
         (rng.gen_range(0..(self.window_size as u32 / self.grid_size as u32)) * self.grid_size as u32) as f64
     }
     pub fn new(window_size: f64, grid_size: f64, texture: G2dTexture) -> Food {
@@ -27,8 +26,9 @@ impl Food {
         return food;
     }
     pub fn regenerate(&mut self) {
-        self.x = self.get_random_coordinate();
-        self.y = self.get_random_coordinate();
+        let mut rng = thread_rng();
+        self.x = self.get_random_coordinate(&mut rng);
+        self.y = self.get_random_coordinate(&mut rng);
     }
     pub fn draw(&self, context: Context, graphics: &mut G2d) {
         Image::new().draw(

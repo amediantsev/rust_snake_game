@@ -4,6 +4,7 @@ use super::Food;
 
 const GRID_SIZE: f64 = 30.0;
 const WINDOW_SIZE: f64 = 600.0;
+const EDGE_POSITION: f64 = WINDOW_SIZE - GRID_SIZE;
 
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -14,34 +15,44 @@ pub enum Direction {
     Right,
 }
 
+#[derive(Debug, PartialEq)]
+struct Position {
+    x: f64,
+    y: f64,
+}
+
 impl Direction {
     fn is_opposite(self, other: Self) -> bool {
-        match self {
-            Direction::Up => other == Direction::Down,
-            Direction::Down => other == Direction::Up,
-            Direction::Left => other == Direction::Right,
-            Direction::Right => other == Direction::Left,
-        }
+        matches!(
+            (self, other),
+            (Direction::Up, Direction::Down)
+            | (Direction::Down, Direction::Up)
+            | (Direction::Left, Direction::Right)
+            | (Direction::Right, Direction::Left)
+        )
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct SnakePiece {
-    x: f64,
-    y: f64,
+    position: Position,
     direction_from: Direction,
     direction_to: Direction,
 }
 
-impl PartialEq<&mut Food> for SnakePiece {
-    fn eq(&self, other: &&mut Food) -> bool {
-        self.x == other.x && self.y == other.y
+impl SnakePiece {
+    fn new(x: f64, y: f64, direction: Direction) -> Self {
+        SnakePiece {
+            position: Position { x, y },
+            direction_from: direction,
+            direction_to: direction,
+        }
     }
 }
 
-impl PartialEq for SnakePiece {
-    fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.y == other.y
+impl PartialEq<&mut Food> for SnakePiece {
+    fn eq(&self, other: &&mut Food) -> bool {
+        self.position.x == other.x && self.position.y == other.y
     }
 }
 
@@ -53,12 +64,7 @@ pub struct Snake {
 impl Default for Snake {
     fn default() -> Self {
         Snake {
-            pieces: vec![SnakePiece {
-                x: 0.0,
-                y: 0.0,
-                direction_from: Direction::Right,
-                direction_to: Direction::Right,
-            }],
+            pieces: vec![SnakePiece::new(0.0, 0.0, Direction::Right)],
             dead: false,
         }
     }
@@ -83,29 +89,17 @@ impl Snake {
     fn generate_new_piece(&mut self) -> SnakePiece {
         let current_head = self.head();
         let (new_x, new_y) = match current_head.direction_to {
-            Direction::Up => {
-                let new_y = current_head.y - GRID_SIZE;
-                (current_head.x, if new_y < 0.0 { WINDOW_SIZE - GRID_SIZE } else { new_y })
-            }
-            Direction::Down => {
-                let new_y = current_head.y + GRID_SIZE;
-                (current_head.x, if new_y >= WINDOW_SIZE { 0.0 } else { new_y })
-            }
-            Direction::Left => {
-                let new_x = current_head.x - GRID_SIZE;
-                (if new_x < 0.0 { WINDOW_SIZE - GRID_SIZE } else { new_x }, current_head.y)
-            }
-            Direction::Right => {
-                let new_x = current_head.x + GRID_SIZE;
-                (if new_x >= WINDOW_SIZE { 0.0 } else { new_x }, current_head.y)
-            }
+            Direction::Up => (current_head.position.x, self.get_new_coordinate(current_head.position.y, false)),
+            Direction::Down => (current_head.position.x, self.get_new_coordinate(current_head.position.y, true)),
+            Direction::Left => (self.get_new_coordinate(current_head.position.x, false), current_head.position.y),
+            Direction::Right => (self.get_new_coordinate(current_head.position.x, true), current_head.position.y),
         };
-        SnakePiece {
-            x: new_x,
-            y: new_y,
-            direction_from: current_head.direction_to,
-            direction_to: current_head.direction_to,
-        }
+        SnakePiece::new(new_x, new_y, current_head.direction_to)
+    }
+
+    fn get_new_coordinate(&self, coordinate: f64, is_increment: bool) -> f64 {
+        let new_coordinate = if is_increment { coordinate + GRID_SIZE } else { coordinate - GRID_SIZE };
+        if new_coordinate < 0.0 { EDGE_POSITION } else if new_coordinate >= WINDOW_SIZE { 0.0 } else { new_coordinate }
     }
 
     pub fn move_ahead(&mut self, food: &mut Food) {
@@ -129,18 +123,18 @@ impl Snake {
         let head = self.head();
         for body_part in &self.pieces {
             let (texture, transform) = if body_part == head {
-                (head_texture, context.transform.trans(body_part.x, body_part.y))
+                (head_texture, context.transform.trans(body_part.position.x, body_part.position.y))
             } else {
                 match (body_part.direction_from, body_part.direction_to) {
                     (Direction::Right | Direction::Left, Direction::Left | Direction::Right) => {
                         // Horizontal straight piece
-                        (body_piece_texture, context.transform.trans(body_part.x, body_part.y))
+                        (body_piece_texture, context.transform.trans(body_part.position.x, body_part.position.y))
                     }
                     (Direction::Up | Direction::Down, Direction::Down | Direction::Up) => {
                         // Vertical straight piece
                         (
                             body_piece_texture,
-                            context.transform.trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0).rot_rad(std::f64::consts::PI / 2.0).trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
+                            context.transform.trans(body_part.position.x + GRID_SIZE / 2.0, body_part.position.y + GRID_SIZE / 2.0).rot_rad(std::f64::consts::PI / 2.0).trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
                         )
                     }
                     (from, to) => {
@@ -159,7 +153,7 @@ impl Snake {
                         };
                         (
                             snake_angle_piece_texture,
-                            context.transform.trans(body_part.x + GRID_SIZE / 2.0, body_part.y + GRID_SIZE / 2.0).rot_rad(rotation_rad).trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
+                            context.transform.trans(body_part.position.x + GRID_SIZE / 2.0, body_part.position.y + GRID_SIZE / 2.0).rot_rad(rotation_rad).trans(-GRID_SIZE / 2.0, -GRID_SIZE / 2.0)
                         )
                     }
                 }
